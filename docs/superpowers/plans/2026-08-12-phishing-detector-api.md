@@ -738,17 +738,35 @@ def validate_url(url: str) -> str:
     if not url or len(url) > MAX_URL_LENGTH:
         raise InvalidURL("URL is empty or longer than 2048 characters.")
 
-    parts = urlsplit(url.strip())
+    # urlsplit itself raises on some malformed input, e.g. an IPv6 literal
+    # with no closing bracket. Uncaught, that escapes the FetchError
+    # taxonomy and becomes a 500 instead of a 400.
+    try:
+        parts = urlsplit(url.strip())
+    except ValueError as exc:
+        raise InvalidURL(f"URL could not be parsed: {exc}") from exc
 
     if parts.scheme not in ALLOWED_SCHEMES:
         raise InvalidURL("Only http and https URLs can be scanned.")
     if not parts.hostname:
         raise InvalidURL("URL has no hostname.")
 
+    # .port is a property that raises when the port is out of range or
+    # non-numeric, so reading it needs the same protection.
+    try:
+        port = parts.port
+    except ValueError as exc:
+        raise InvalidURL(f"URL has an invalid port: {exc}") from exc
+
     # Drop any user:password@ before the request is ever made.
-    netloc = parts.hostname
-    if parts.port:
-        netloc = f"{netloc}:{parts.port}"
+    # .hostname strips the brackets from an IPv6 literal, so they have to
+    # go back on — otherwise "[2606:4700::1111]" rebuilds as host "2606"
+    # with the rest read as a port, and the IPv6 address checks below
+    # never see the real address.
+    host = parts.hostname
+    netloc = f"[{host}]" if ":" in host else host
+    if port:
+        netloc = f"{netloc}:{port}"
 
     return urlunsplit((parts.scheme, netloc, parts.path or "/", parts.query, ""))
 
@@ -884,10 +902,17 @@ def fetch(url: str, settings) -> FetchResult:
             if response.status_code >= 400:
                 raise FetchFailed(f"Page returned HTTP {response.status_code}.")
 
-            content_type = response.headers.get("Content-Type", "").split(";")[0].strip()
-            if content_type and content_type not in ALLOWED_CONTENT_TYPES:
+            # Compare lowercased: a server sending "Text/HTML" is fine.
+            # Note there is no `content_type and ...` guard here — an
+            # absent header yields "", and letting that through would
+            # mean an unlabelled response skips the check entirely. A
+            # security guard has to fail closed.
+            content_type = (
+                response.headers.get("Content-Type", "").split(";")[0].strip().lower()
+            )
+            if content_type not in ALLOWED_CONTENT_TYPES:
                 raise UnsupportedContentType(
-                    f"Expected HTML, got {content_type}."
+                    f"Expected HTML, got {content_type or 'no Content-Type header'}."
                 )
 
             html, truncated = _read_capped(response, settings.max_body_bytes)
