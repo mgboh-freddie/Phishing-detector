@@ -152,12 +152,16 @@ Supplying both `url` and `html` is valid and does not fetch. Supplying neither i
 
 | Code | Condition | Rationale |
 |---|---|---|
-| `small_simple_site` | `verdict == "phishing"` and `tag_count < 150` | The documented benign/malicious tag-count split (514 vs 91 median). This is where the model's learned shortcut fires and where false accusations concentrate. |
+| `small_simple_site` | `verdict == "phishing"` and `tag_count < 400` | The documented benign/malicious tag-count split (514 vs 91 median). This is where the model's learned shortcut fires and where false accusations concentrate. |
 | `no_links_found` | No URL-bearing attributes on the page, so `min_link_length` fell back to 0 | `min_link_length` is flagged in `html_feature_spec.md` as a likely mismatch against the researchers' definition when a page has no links. |
 | `tls_verification_failed` | certificate did not validate | A signal in its own right, not an error to swallow. |
 | `truncated` | body hit the 5 MB cap | Features were computed on partial HTML and are unreliable. |
 
-The `small_simple_site` threshold of 150 tags is a starting value chosen to sit between the two medians. It is configurable and expected to be tuned once real false-positive data exists — and to be removed entirely once retraining eliminates the bias.
+The `small_simple_site` threshold is **400 tags**: below the 514-tag median of benign training pages, and above the 357 tags of `realistic_benign.html`, the bakery page the README names as the canonical false positive. The line means "this page has fewer tags than a typical legitimate site, so the documented bias is a plausible explanation for the verdict".
+
+An earlier draft used 150, chosen to sit between the 91 and 514 medians. That was wrong: those medians describe the training corpus, not any individual page, and at 150 the one page the project already knows is misjudged would have received no warning at all. The value is configurable and expected to be tuned once real false-positive data exists — and removed entirely once retraining eliminates the bias.
+
+The trade-off is deliberate: at 400 the warning also fires on genuine phishing pages, which are small by nature. That is acceptable, because the warning is a statement about the strength of the evidence rather than a claim that the verdict is wrong.
 
 ### 4.4 Errors
 
@@ -284,7 +288,7 @@ All settings come from environment variables, documented in `.env.example`.
 | `FETCH_CONNECT_TIMEOUT` | `5` | Seconds |
 | `FETCH_READ_TIMEOUT` | `10` | Seconds |
 | `MAX_REDIRECTS` | `3` | Hops |
-| `SMALL_SITE_TAG_THRESHOLD` | `150` | Fires `small_simple_site` |
+| `SMALL_SITE_TAG_THRESHOLD` | `400` | Fires `small_simple_site` |
 | `STORE_RAW_HTML` | `false` | Retention for data collection |
 | `DASHBOARD_PASSWORD` | — | Required; app refuses to start without it |
 | `SECRET_KEY` | — | Required; session signing |
