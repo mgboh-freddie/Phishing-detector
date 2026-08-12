@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Environment / secrets
+.env
+.env.local
+
+# Runtime data
+*.db
+*.db-journal
+*.sqlite3
+
+# Collected pages and collector output
+raw/
+*.errors.txt
+results.csv
+phish.csv
+benign.csv
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+
+# Keep .vscode/settings.json — it is shared project config
+!.vscode/settings.json

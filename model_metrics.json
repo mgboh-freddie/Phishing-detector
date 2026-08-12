@@ -1,0 +1,12 @@
+{
+  "model": "ExtraTrees(n_estimators=200, min_samples_leaf=1, max_features=sqrt)",
+  "threshold": 0.3,
+  "validation": "5-fold stratified cross-validation on 19,997 samples",
+  "catch_rate_recall": 0.9672,
+  "precision": 0.8845,
+  "roc_auc": 0.9845,
+  "missed_phishing": 328,
+  "false_alarms": 1263,
+  "paper_benchmark_f1_randomforest": 0.9386,
+  "dataset": "CIC-Trap4Phish (CC BY-NC 4.0)"
+}
