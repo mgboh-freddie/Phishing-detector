@@ -69,7 +69,10 @@ def validate_url(url: str) -> str:
     if not url or len(url) > MAX_URL_LENGTH:
         raise InvalidURL("URL is empty or longer than 2048 characters.")
 
-    parts = urlsplit(url.strip())
+    try:
+        parts = urlsplit(url.strip())
+    except ValueError as exc:
+        raise InvalidURL(f"URL could not be parsed: {exc}") from exc
 
     if parts.scheme not in ALLOWED_SCHEMES:
         raise InvalidURL("Only http and https URLs can be scanned.")
@@ -77,9 +80,17 @@ def validate_url(url: str) -> str:
         raise InvalidURL("URL has no hostname.")
 
     # Drop any user:password@ before the request is ever made.
-    netloc = parts.hostname
-    if parts.port:
-        netloc = f"{netloc}:{parts.port}"
+    # IPv6 literals lose their brackets in parts.hostname, so they must be
+    # re-wrapped here or the rebuilt netloc is corrupted (host truncated,
+    # remainder of the address parsed as a bogus port).
+    hostname = parts.hostname
+    netloc = f"[{hostname}]" if ":" in hostname else hostname
+    try:
+        port = parts.port
+    except ValueError as exc:
+        raise InvalidURL(f"URL has an invalid port: {exc}") from exc
+    if port:
+        netloc = f"{netloc}:{port}"
 
     return urlunsplit((parts.scheme, netloc, parts.path or "/", parts.query, ""))
 
@@ -220,10 +231,12 @@ def fetch(url: str, settings) -> FetchResult:
             if response.status_code >= 400:
                 raise FetchFailed(f"Page returned HTTP {response.status_code}.")
 
-            content_type = response.headers.get("Content-Type", "").split(";")[0].strip()
-            if content_type and content_type not in ALLOWED_CONTENT_TYPES:
+            content_type = (
+                response.headers.get("Content-Type", "").split(";")[0].strip().lower()
+            )
+            if content_type not in ALLOWED_CONTENT_TYPES:
                 raise UnsupportedContentType(
-                    f"Expected HTML, got {content_type}."
+                    f"Expected HTML, got {content_type or 'no Content-Type header'}."
                 )
 
             html, truncated = _read_capped(response, settings.max_body_bytes)
