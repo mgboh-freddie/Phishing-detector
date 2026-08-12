@@ -2,6 +2,14 @@
 # version risks silently different predictions from the same model.
 scikit-learn==1.8.0
 
+# Held below 2.5 for the same reason. joblib 1.5.3 unpickles arrays by
+# assigning to `.shape`, which NumPy 2.5 deprecates — it emitted 1602
+# DeprecationWarnings on every model load, and the deprecation becomes an
+# error in a later NumPy, at which point the model stops loading at all.
+# joblib has no fixed release yet, so the pin is the fix. Revisit when it
+# does. Verified: predictions are byte-identical either way.
+numpy<2.5
+
 fastapi==0.136.1
 uvicorn[standard]==0.47.0
 pydantic==2.12.5
