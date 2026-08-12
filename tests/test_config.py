@@ -14,7 +14,7 @@ def test_defaults_match_the_spec(monkeypatch):
     assert s.default_threshold == 0.30
     assert s.max_body_bytes == 5242880
     assert s.max_redirects == 3
-    assert s.small_site_tag_threshold == 150
+    assert s.small_site_tag_threshold == 400
     assert s.store_raw_html is False
 
 

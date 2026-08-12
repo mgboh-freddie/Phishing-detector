@@ -49,7 +49,7 @@ def get_settings() -> Settings:
         fetch_connect_timeout=float(os.environ.get("FETCH_CONNECT_TIMEOUT", "5")),
         fetch_read_timeout=float(os.environ.get("FETCH_READ_TIMEOUT", "10")),
         max_redirects=int(os.environ.get("MAX_REDIRECTS", "3")),
-        small_site_tag_threshold=int(os.environ.get("SMALL_SITE_TAG_THRESHOLD", "150")),
+        small_site_tag_threshold=int(os.environ.get("SMALL_SITE_TAG_THRESHOLD", "400")),
         store_raw_html=_bool("STORE_RAW_HTML", False),
         dashboard_password=_required("DASHBOARD_PASSWORD"),
         secret_key=_required("SECRET_KEY"),
