@@ -79,10 +79,16 @@ def register_error_handlers(app):
 
     @app.exception_handler(Exception)
     def handle_unhandled_exception(request: Request, exc: Exception):
-        logger.exception(
+        # exc_info=exc is load-bearing. An exception handler does not run
+        # inside an `except` block, so sys.exc_info() is empty here and a
+        # bare logger.exception() logs "NoneType: None" -- no traceback.
+        # The client is deliberately told nothing useful, so the server log
+        # is the only record there is.
+        logger.error(
             "Unhandled exception while processing %s %s",
             request.method,
             request.url.path,
+            exc_info=exc,
         )
         return JSONResponse(
             status_code=500,

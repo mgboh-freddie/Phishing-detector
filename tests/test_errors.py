@@ -45,3 +45,32 @@ def test_unhandled_exception_returns_generic_500_without_leaking_details():
     assert isinstance(body["error"]["message"], str)
     assert "leaked internal path" not in response.text
     assert "/etc/secret-config.yaml" not in response.text
+
+
+def test_unhandled_exception_logs_a_real_traceback(caplog):
+    """The client is told nothing useful, so the server log is the only
+    record of what went wrong. A bare logger.exception() in a handler logs
+    "NoneType: None" — no traceback — because a handler does not run inside
+    an except block."""
+    import logging
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from api.errors import register_error_handlers
+
+    app = FastAPI()
+    register_error_handlers(app)
+
+    @app.get("/boom")
+    def boom():
+        raise RuntimeError("the original cause")
+
+    with caplog.at_level(logging.ERROR, logger="api.errors"):
+        with TestClient(app, raise_server_exceptions=False) as client:
+            assert client.get("/boom").status_code == 500
+
+    record = next(r for r in caplog.records if r.name == "api.errors")
+    assert record.exc_info is not None, "traceback was not captured"
+    assert "RuntimeError" in caplog.text
+    assert "the original cause" in caplog.text
