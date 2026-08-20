@@ -22,4 +22,9 @@ joblib==1.5.3
 pandas==2.3.3
 
 pytest==9.0.2
-httpx>=0.27
+
+# starlette's TestClient deprecated httpx in favour of httpx2 and says so
+# on every run. Installing what it asks for silences the warning at its
+# source; filtering it in pytest.ini would have hidden a real future
+# breakage instead. Test-only -- the service itself uses requests.
+httpx2>=2.12
