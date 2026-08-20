@@ -12,7 +12,7 @@ def fake_fetch(monkeypatch):
     def _fetch(url, settings):
         return FetchResult(
             html=read_fixture("phishy.html"),
-            final_url="https://phish.test/login",
+            final_url="https://phish.test/login-final",
             tls_verified=False,
             truncated=False,
         )
@@ -20,17 +20,18 @@ def fake_fetch(monkeypatch):
     monkeypatch.setattr(service, "fetch", _fetch)
 
 
-def test_scan_url_reports_the_final_url_and_tls_state(client, fake_fetch):
+def test_scan_url_reports_the_final_url_not_the_submitted_one(client, fake_fetch):
     response = client.post(
         "/v1/scan",
-        json={"url": "https://phish.test/login"},
+        json={"url": "https://phish.test/start"},
         headers=client.auth_headers,
     )
 
     assert response.status_code == 200
     body = response.json()
     assert body["source"] == "url"
-    assert body["target"] == "https://phish.test/login"
+    assert body["target"] == "https://phish.test/login-final"
+    assert body["target"] != "https://phish.test/start"
     assert body["tls_verified"] is False
     assert "tls_verification_failed" in body["warnings"]
 

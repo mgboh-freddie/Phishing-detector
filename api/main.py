@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from api import store
 from api.config import get_settings
 from api.errors import register_error_handlers
+from api.limits import MaxBodySizeMiddleware
 from api.routers import scan as scan_router
 from api.scoring import load_bundle
 
@@ -37,6 +38,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     register_error_handlers(app)
+    app.add_middleware(MaxBodySizeMiddleware)
     app.include_router(scan_router.router)
     return app
 
