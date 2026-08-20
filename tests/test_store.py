@@ -42,9 +42,7 @@ def test_ids_remain_strictly_increasing_after_backward_clock_step(monkeypatch):
     clock_ms[0] += 100  # advance to 1100ms
     ids_phase2 = [store.new_id("scn") for _ in range(5)]
 
-    # Step the clock backward by 3 seconds (simulate NTP correction)
-    clock_ms[0] -= 3000  # back to -1900ms... wait that's wrong
-    # Let me reconsider: clock_ms is at 1100, step back to 800
+    # Step the clock backward from 1100ms to 800ms (simulate an NTP correction)
     clock_ms[0] = 800
     # Issue more ids despite the backward step
     ids_phase3 = [store.new_id("scn") for _ in range(5)]
@@ -52,6 +50,37 @@ def test_ids_remain_strictly_increasing_after_backward_clock_step(monkeypatch):
     all_ids = ids_phase1 + ids_phase2 + ids_phase3
     assert len(set(all_ids)) == 15, "All ids must be unique"
     assert all_ids == sorted(all_ids), "Ids must remain strictly increasing despite clock step backward"
+
+
+def test_counter_overflow_borrows_a_millisecond_instead_of_wrapping(monkeypatch):
+    """A sustained backward clock step pins the timestamp while the counter
+    keeps incrementing. If the counter were allowed to run past its width,
+    _encode would wrap it back to 0 and produce a duplicate, out-of-order
+    id. It must instead borrow a millisecond and restart the counter there.
+
+    The clock is frozen so it cannot advance on its own, and the module's
+    counter state is parked one step below its limit so only a handful of
+    ids are needed to cross the boundary -- generating a million ids here
+    would make the suite crawl.
+    """
+    frozen_ms = 5_000_000
+
+    def mock_time():
+        return frozen_ms / 1000.0
+
+    monkeypatch.setattr("api.store.time.time", mock_time)
+
+    original_stamp = list(store._last_stamp)
+    store._last_stamp[0] = frozen_ms
+    store._last_stamp[1] = store.COUNTER_LIMIT - 3
+    try:
+        ids = [store.new_id("scn") for _ in range(6)]
+    finally:
+        store._last_stamp[0] = original_stamp[0]
+        store._last_stamp[1] = original_stamp[1]
+
+    assert len(set(ids)) == 6, "Ids must stay unique across a counter overflow"
+    assert ids == sorted(ids), "Ids must stay strictly increasing across a counter overflow"
 
 
 def test_create_key_returns_plaintext_once_and_stores_only_a_hash(db):

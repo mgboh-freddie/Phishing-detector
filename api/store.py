@@ -71,6 +71,9 @@ def utcnow() -> str:
 _sequence_lock = threading.Lock()
 _last_stamp = [0, 0]  # [milliseconds, counter within that millisecond]
 
+COUNTER_WIDTH = 4  # base32 characters used to encode the counter
+COUNTER_LIMIT = 32 ** COUNTER_WIDTH  # values the counter can hold before _encode would wrap it
+
 
 def _encode(value: int, width: int) -> str:
     out = ""
@@ -94,18 +97,32 @@ def new_id(prefix: str) -> str:
     using the last seen timestamp and increment the counter instead. This
     ensures ids always sort strictly increasing, preserving 'newest first'
     ordering even across clock anomalies.
+
+    A sustained backward clock step can pin the timestamp for long enough
+    that the counter itself would run out of room. If that happened and we
+    let it wrap, _encode would silently start reusing values (counter 0
+    again after COUNTER_LIMIT), producing duplicate, out-of-order ids --
+    exactly what this function exists to prevent. Instead, when the counter
+    would overflow its width, we borrow a millisecond from the future and
+    restart the counter there (the same trick ULID uses), which keeps ids
+    unique and strictly increasing at the cost of running very slightly
+    ahead of the wall clock.
     """
     with _sequence_lock:
         ms = max(int(time.time() * 1000), _last_stamp[0])
         if ms == _last_stamp[0]:
             _last_stamp[1] += 1
+            if _last_stamp[1] >= COUNTER_LIMIT:
+                _last_stamp[0] += 1
+                _last_stamp[1] = 0
         else:
             _last_stamp[0] = ms
             _last_stamp[1] = 0
+        ms = _last_stamp[0]
         counter = _last_stamp[1]
 
     rand = "".join(secrets.choice(CROCKFORD) for _ in range(12))
-    return f"{prefix}_{_encode(ms, 10)}{_encode(counter, 4)}{rand}"
+    return f"{prefix}_{_encode(ms, 10)}{_encode(counter, COUNTER_WIDTH)}{rand}"
 
 
 @contextmanager
