@@ -88,9 +88,15 @@ def new_id(prefix: str) -> str:
     and without it two ids from that millisecond would sort by their
     random tail — which would make 'newest first' ordering unreliable
     exactly when it is most likely to be tested.
+
+    The timestamp is clamped to never decrease. If the system clock steps
+    backward (NTP correction, VM resync, leap-second smear), we continue
+    using the last seen timestamp and increment the counter instead. This
+    ensures ids always sort strictly increasing, preserving 'newest first'
+    ordering even across clock anomalies.
     """
     with _sequence_lock:
-        ms = int(time.time() * 1000)
+        ms = max(int(time.time() * 1000), _last_stamp[0])
         if ms == _last_stamp[0]:
             _last_stamp[1] += 1
         else:

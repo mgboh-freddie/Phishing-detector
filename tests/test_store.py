@@ -25,6 +25,35 @@ def test_ids_are_prefixed_and_strictly_increasing():
     assert ids == sorted(ids)
 
 
+def test_ids_remain_strictly_increasing_after_backward_clock_step(monkeypatch):
+    """If the system clock steps backward, ids must still sort strictly
+    increasing. The timestamp is clamped to the highest seen value, so the
+    counter increments instead of the timestamp moving backward."""
+    # Start with a baseline time: 1000ms since epoch
+    clock_ms = [1000]
+
+    def mock_time():
+        return clock_ms[0] / 1000.0
+
+    monkeypatch.setattr("api.store.time.time", mock_time)
+
+    # Issue several ids with advancing time
+    ids_phase1 = [store.new_id("scn") for _ in range(5)]
+    clock_ms[0] += 100  # advance to 1100ms
+    ids_phase2 = [store.new_id("scn") for _ in range(5)]
+
+    # Step the clock backward by 3 seconds (simulate NTP correction)
+    clock_ms[0] -= 3000  # back to -1900ms... wait that's wrong
+    # Let me reconsider: clock_ms is at 1100, step back to 800
+    clock_ms[0] = 800
+    # Issue more ids despite the backward step
+    ids_phase3 = [store.new_id("scn") for _ in range(5)]
+
+    all_ids = ids_phase1 + ids_phase2 + ids_phase3
+    assert len(set(all_ids)) == 15, "All ids must be unique"
+    assert all_ids == sorted(all_ids), "Ids must remain strictly increasing despite clock step backward"
+
+
 def test_create_key_returns_plaintext_once_and_stores_only_a_hash(db):
     key_id, plaintext = store.create_key(db, "sam")
 
