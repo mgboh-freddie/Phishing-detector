@@ -36,6 +36,17 @@ def health(request: Request):
     }
 
 
+def _metrics_path(model_path: str) -> str:
+    """A sibling `<model-stem>_metrics.json` next to the configured model,
+    falling back to the historical `model_metrics.json` name so the
+    current bundle keeps working unchanged."""
+    stem, _ = os.path.splitext(model_path)
+    derived = f"{stem}_metrics.json"
+    if os.path.exists(derived):
+        return derived
+    return "model_metrics.json"
+
+
 @router.get("/model")
 def model_info(
     request: Request,
@@ -48,13 +59,14 @@ def model_info(
     # It is supporting detail; the threshold, features, licence, and known
     # limitations below are the parts a caller actually needs, and they
     # come from the bundle rather than this file.
+    metrics_path = _metrics_path(settings.model_path)
     metrics = {}
-    if os.path.exists("model_metrics.json"):
+    if os.path.exists(metrics_path):
         try:
-            with open("model_metrics.json", "r", encoding="utf-8") as fh:
+            with open(metrics_path, "r", encoding="utf-8") as fh:
                 metrics = json.load(fh)
         except (json.JSONDecodeError, OSError):
-            logger.warning("model_metrics.json is unreadable; reporting no metrics.")
+            logger.warning("%s is unreadable; reporting no metrics.", metrics_path)
 
     return {
         "model_version": bundle.version,
@@ -62,6 +74,6 @@ def model_info(
         "your_default_threshold": key_row["threshold"],
         "features": bundle.features,
         "metrics": metrics,
-        "licence": LICENCE,
-        "known_limitations": KNOWN_LIMITATIONS,
+        "licence": bundle.licence or LICENCE,
+        "known_limitations": bundle.known_limitations or KNOWN_LIMITATIONS,
     }

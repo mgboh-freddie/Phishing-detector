@@ -13,6 +13,7 @@ features.
 import ipaddress
 import socket
 from dataclasses import dataclass
+from typing import Optional
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import requests
@@ -60,7 +61,7 @@ class FetchTimeout(FetchError):
 class FetchResult:
     html: str
     final_url: str
-    tls_verified: bool
+    tls_verified: Optional[bool]
     truncated: bool
 
 
@@ -198,7 +199,10 @@ def _read_capped(response, limit: int):
             continue
         chunks.append(chunk)
         total += len(chunk)
-        if total >= limit:
+        # Strictly greater than: a body of exactly `limit` bytes with
+        # nothing left to read must not be reported as truncated. Only
+        # stop once a byte past the cap has actually been read.
+        if total > limit:
             truncated = True
             break
 
@@ -209,15 +213,30 @@ def _read_capped(response, limit: int):
 
 def fetch(url: str, settings) -> FetchResult:
     current = guard_url(url)
-    tls_verified = True
+
+    # Latched across the whole redirect chain rather than reassigned per
+    # hop: an early broken certificate must not be erased by a later clean
+    # one. None means "no https hop seen yet" -- a plain-http hop is not
+    # applicable to TLS, not a failure, so it never sets this to False.
+    # Once any https hop fails verification the result is False for good;
+    # otherwise it is True if at least one https hop verified cleanly, and
+    # None if the whole chain was plain http.
+    tls_verified = None
 
     for _ in range(settings.max_redirects + 1):
         try:
-            response, tls_verified = _get_with_tls_fallback(current, settings)
+            response, verified = _get_with_tls_fallback(current, settings)
         except requests.exceptions.Timeout as exc:
             raise FetchTimeout("The page took too long to respond.") from exc
         except requests.exceptions.RequestException as exc:
             raise FetchFailed(f"Could not fetch the page: {exc}") from exc
+
+        if urlsplit(current).scheme == "https":
+            if verified:
+                if tls_verified is not False:
+                    tls_verified = True
+            else:
+                tls_verified = False
 
         if 300 <= response.status_code < 400 and response.headers.get("Location"):
             target = urljoin(current, response.headers["Location"])

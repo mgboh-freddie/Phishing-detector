@@ -6,7 +6,8 @@ ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /app
 
-# lxml needs a compiler on slim images unless a wheel is available.
+# curl is here for the HEALTHCHECK below -- it is not present in the
+# slim base image.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl \
  && rm -rf /var/lib/apt/lists/*

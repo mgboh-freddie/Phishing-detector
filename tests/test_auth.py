@@ -15,6 +15,7 @@ def test_missing_header_is_rejected(db):
     with pytest.raises(AuthError) as exc:
         authenticate(db, None)
     assert exc.value.status == 401
+    assert exc.value.retry_after is None
 
 
 @pytest.mark.parametrize(

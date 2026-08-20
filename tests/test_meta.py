@@ -49,3 +49,48 @@ def test_missing_metrics_file_does_not_break_the_endpoint(client, tmp_path, monk
 
     assert response.status_code == 200
     assert response.json()["metrics"] == {}
+
+
+def test_model_metadata_prefers_the_bundles_own_licence_and_limitations(
+    tmp_path, monkeypatch
+):
+    """A retrained, relicensed bundle must not still be reported as the
+    non-commercial CC BY-NC model with the old bias description -- the
+    whole point of MODEL_PATH being configuration is that this swap works."""
+    import joblib
+
+    raw = joblib.load("phishing_html_model.joblib")
+    raw["licence"] = "MIT -- commercial use permitted."
+    raw["known_limitations"] = ["Retrained; the small-site bias no longer applies."]
+    bundle_path = tmp_path / "custom_model.joblib"
+    joblib.dump(raw, bundle_path)
+
+    monkeypatch.setenv("MODEL_PATH", str(bundle_path))
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "api.db"))
+    monkeypatch.setenv("DASHBOARD_PASSWORD", "test-password")
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
+    monkeypatch.setenv("DEBUG", "true")
+
+    from fastapi.testclient import TestClient
+
+    from api import store
+    from api.config import get_settings
+    from api.main import create_app
+
+    get_settings.cache_clear()
+    app = create_app()
+    with TestClient(app) as test_client:
+        _, plaintext = store.create_key(
+            get_settings().db_path, "test", threshold=0.30, rate_limit=60
+        )
+        response = test_client.get(
+            "/v1/model", headers={"Authorization": f"Bearer {plaintext}"}
+        )
+    get_settings.cache_clear()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["licence"] == "MIT -- commercial use permitted."
+    assert body["known_limitations"] == [
+        "Retrained; the small-site bias no longer applies."
+    ]

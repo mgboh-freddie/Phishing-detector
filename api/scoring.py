@@ -9,7 +9,7 @@ Refusing to start is the only safe response.
 import hashlib
 import os
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 import joblib
 import pandas as pd
@@ -23,6 +23,12 @@ class Bundle:
     threshold: float
     features: list
     version: str
+    # Carried by a retrained bundle when it needs to say something
+    # different from this codebase's defaults -- e.g. a relicensed,
+    # commercially usable model. None when the bundle carries neither,
+    # in which case the caller falls back to its own constants.
+    licence: Optional[str] = None
+    known_limitations: Optional[list] = None
 
 
 def _file_version(path: str) -> str:
@@ -58,6 +64,8 @@ def load_bundle(path: str) -> Bundle:
         threshold=float(raw["threshold"]),
         features=features,
         version=version,
+        licence=raw.get("licence"),
+        known_limitations=raw.get("known_limitations"),
     )
 
 

@@ -179,3 +179,109 @@ def test_redirect_to_private_address_is_blocked(monkeypatch):
 
     with pytest.raises(BlockedURL):
         f.fetch("http://public.test/", settings)
+
+
+def test_plain_http_reports_tls_verified_as_none(monkeypatch):
+    """No TLS handshake ever happened, so "verified" does not apply --
+    it must not be reported as True."""
+    import api.fetching as f
+
+    settings = _redirect_test_settings()
+    monkeypatch.setattr(f, "resolve_host", lambda host: ["8.8.8.8"])
+    monkeypatch.setattr(
+        f,
+        "_request",
+        lambda url, settings, verify: (
+            _FakeOKResponse({"Content-Type": "text/html"}),
+            True,
+        ),
+    )
+
+    result = f.fetch("http://public.test/", settings)
+
+    assert result.tls_verified is None
+
+
+def test_redirect_chain_latches_an_early_tls_failure(monkeypatch):
+    """The first hop's broken certificate must not be erased by a later
+    hop that verifies cleanly -- the chain as a whole is unverified."""
+    import api.fetching as f
+
+    settings = _redirect_test_settings()
+    hosts = {"first.test": ["8.8.8.8"], "second.test": ["8.8.8.8"]}
+    monkeypatch.setattr(f, "resolve_host", lambda host: hosts[host])
+
+    class RedirectResponse:
+        status_code = 302
+        headers = {"Location": "https://second.test/"}
+
+        def close(self):
+            pass
+
+    def fake_request(url, settings, verify):
+        if "first.test" in url:
+            return RedirectResponse(), False
+        return _FakeOKResponse({"Content-Type": "text/html"}), True
+
+    monkeypatch.setattr(f, "_request", fake_request)
+
+    result = f.fetch("https://first.test/", settings)
+
+    assert result.tls_verified is False
+
+
+def _capped_settings(max_body_bytes):
+    from api.config import Settings
+
+    return Settings(
+        model_path="x", db_path=":memory:", default_threshold=0.3,
+        max_body_bytes=max_body_bytes, fetch_connect_timeout=5, fetch_read_timeout=10,
+        max_redirects=3, small_site_tag_threshold=400, store_raw_html=False,
+        dashboard_password="pw", secret_key="sk", debug=True,
+    )
+
+
+class _FakeBodyResponse:
+    def __init__(self, body):
+        self.status_code = 200
+        self.headers = {"Content-Type": "text/html"}
+        self.encoding = "utf-8"
+        self._body = body
+
+    def iter_content(self, chunk_size=65536):
+        yield self._body
+
+    def close(self):
+        pass
+
+
+def test_body_of_exactly_the_cap_is_not_truncated(monkeypatch):
+    import api.fetching as f
+
+    settings = _capped_settings(10)
+    body = b"a" * 10
+    monkeypatch.setattr(f, "resolve_host", lambda host: ["8.8.8.8"])
+    monkeypatch.setattr(
+        f, "_request", lambda url, settings, verify: (_FakeBodyResponse(body), True)
+    )
+
+    result = f.fetch("https://public.test/", settings)
+
+    assert result.truncated is False
+    assert len(result.html) == 10
+
+
+def test_body_one_byte_over_the_cap_is_truncated(monkeypatch):
+    import api.fetching as f
+
+    settings = _capped_settings(10)
+    body = b"a" * 11
+    monkeypatch.setattr(f, "resolve_host", lambda host: ["8.8.8.8"])
+    monkeypatch.setattr(
+        f, "_request", lambda url, settings, verify: (_FakeBodyResponse(body), True)
+    )
+
+    result = f.fetch("https://public.test/", settings)
+
+    assert result.truncated is True
+    assert len(result.html) == 10

@@ -4,6 +4,16 @@ import os
 from dataclasses import dataclass
 from functools import lru_cache
 
+from dotenv import find_dotenv, load_dotenv
+
+# Populates os.environ from a .env file found by walking up from the
+# current working directory. Real environment variables already set take
+# precedence -- that is load_dotenv's default, so override is deliberately
+# not passed. usecwd=True anchors the search on cwd rather than this
+# file's location, which is what "run it from the project root" means in
+# practice, for both the app and the tests that exercise this.
+load_dotenv(find_dotenv(usecwd=True))
+
 TRUTHY = {"1", "true", "yes", "on"}
 
 

@@ -10,6 +10,11 @@ scikit-learn==1.8.0
 # does. Verified: predictions are byte-identical either way.
 numpy<2.5
 
+# Loads .env into the process environment at import time so the documented
+# `cp .env.example .env` quickstart actually works. Real environment
+# variables still win -- see api/config.py.
+python-dotenv==1.2.2
+
 fastapi==0.136.1
 uvicorn[standard]==0.47.0
 pydantic==2.12.5

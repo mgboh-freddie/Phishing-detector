@@ -13,6 +13,7 @@ from fastapi.templating import Jinja2Templates
 from api import store
 from api.config import Settings, get_settings
 from api.fetching import FetchError
+from api.routers.scan import ALLOWED_UPLOAD_SUFFIXES
 from api.schemas import MAX_HTML_BYTES
 from api.sessions import sign, verify
 from api.service import run_scan
@@ -46,7 +47,9 @@ def login(
     password: str = Form(...),
     settings: Settings = Depends(get_settings),
 ):
-    if not hmac.compare_digest(password, settings.dashboard_password):
+    if not hmac.compare_digest(
+        password.encode("utf-8"), settings.dashboard_password.encode("utf-8")
+    ):
         return templates.TemplateResponse(
             request,
             "login.html",
@@ -77,7 +80,14 @@ def scan_form(request: Request, settings: Settings = Depends(get_settings)):
     if not is_signed_in(request, settings):
         return _redirect("/login")
     return templates.TemplateResponse(
-        request, "scan.html", {"signed_in": True, "result": None, "error": None}
+        request,
+        "scan.html",
+        {
+            "signed_in": True,
+            "result": None,
+            "error": None,
+            "default_threshold": settings.default_threshold,
+        },
     )
 
 
@@ -86,17 +96,33 @@ async def submit_scan(
     request: Request,
     url: str = Form(default=""),
     html: str = Form(default=""),
-    threshold: float = Form(default=0.30),
+    threshold: float = Form(default=None),
     file: UploadFile = File(default=None),
     settings: Settings = Depends(get_settings),
 ):
     if not is_signed_in(request, settings):
         return _redirect("/login")
 
-    context = {"signed_in": True, "result": None, "error": None}
+    context = {
+        "signed_in": True,
+        "result": None,
+        "error": None,
+        "default_threshold": settings.default_threshold,
+    }
+
+    resolved_threshold = (
+        threshold if threshold is not None else settings.default_threshold
+    )
+    if not 0.0 <= resolved_threshold <= 1.0:
+        context["error"] = "Threshold must be between 0 and 1."
+        return templates.TemplateResponse(request, "scan.html", context)
 
     uploaded = None
     if file is not None and file.filename:
+        if not file.filename.lower().endswith(ALLOWED_UPLOAD_SUFFIXES):
+            context["error"] = "Only .html and .htm files can be scanned."
+            return templates.TemplateResponse(request, "scan.html", context)
+
         raw = await file.read(MAX_HTML_BYTES + 1)
         if len(raw) > MAX_HTML_BYTES:
             context["error"] = "That file is larger than 5 MB."
@@ -118,12 +144,12 @@ async def submit_scan(
             request.app.state.bundle,
             settings,
             key_id=store.INTERNAL_KEY_ID,
-            threshold_default=threshold,
+            threshold_default=resolved_threshold,
             html=body,
             url=url.strip() or None,
             source=source,
             target=target,
-            requested_threshold=threshold,
+            requested_threshold=resolved_threshold,
         )
     except FetchError as exc:
         context["error"] = str(exc)
@@ -160,5 +186,6 @@ def scan_detail(
             "signed_in": True,
             "result": record,
             "error": None if record else "No such scan.",
+            "default_threshold": settings.default_threshold,
         },
     )

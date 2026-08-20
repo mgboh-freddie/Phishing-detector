@@ -79,3 +79,70 @@ def test_logout_clears_the_session(signed_in):
     signed_in.post("/logout")
     response = signed_in.get("/", follow_redirects=False)
     assert response.status_code == 303
+
+
+def test_non_ascii_wrong_password_gives_401_not_500(client):
+    response = client.post("/login", data={"password": "pässwort"})
+    assert response.status_code == 401
+    assert "Incorrect password" in response.text
+
+
+def test_non_ascii_dashboard_password_can_log_in(tmp_path, monkeypatch):
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "api.db"))
+    monkeypatch.setenv("DASHBOARD_PASSWORD", "pässwort")
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
+    monkeypatch.setenv("DEBUG", "true")
+
+    from fastapi.testclient import TestClient
+
+    from api.config import get_settings
+    from api.main import create_app
+
+    get_settings.cache_clear()
+    app = create_app()
+    with TestClient(app) as test_client:
+        response = test_client.post(
+            "/login", data={"password": "pässwort"}, follow_redirects=False
+        )
+        assert response.status_code == 303
+
+    get_settings.cache_clear()
+
+
+def test_out_of_range_threshold_shows_an_error(signed_in):
+    response = signed_in.post(
+        "/", data={"html": "<html><body></body></html>", "threshold": "-1"}
+    )
+    assert response.status_code == 200
+    assert "between 0 and 1" in response.text
+
+
+def test_dashboard_form_reflects_a_custom_default_threshold(tmp_path, monkeypatch):
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "api.db"))
+    monkeypatch.setenv("DASHBOARD_PASSWORD", "test-password")
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
+    monkeypatch.setenv("DEBUG", "true")
+    monkeypatch.setenv("DEFAULT_THRESHOLD", "0.50")
+
+    from fastapi.testclient import TestClient
+
+    from api.config import get_settings
+    from api.main import create_app
+
+    get_settings.cache_clear()
+    app = create_app()
+    with TestClient(app) as test_client:
+        test_client.post("/login", data={"password": "test-password"})
+        response = test_client.get("/")
+        assert 'value="0.50"' in response.text
+
+    get_settings.cache_clear()
+
+
+def test_uploading_a_non_html_file_shows_an_error(signed_in):
+    response = signed_in.post(
+        "/",
+        files={"file": ("malware.exe", b"MZ\x90\x00", "application/octet-stream")},
+    )
+    assert response.status_code == 200
+    assert "Only .html and .htm files can be scanned" in response.text

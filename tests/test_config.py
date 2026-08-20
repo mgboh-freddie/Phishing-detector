@@ -47,3 +47,42 @@ def test_settings_is_immutable(monkeypatch):
     s = get_settings()
     with pytest.raises(Exception):
         s.default_threshold = 0.9
+
+
+def test_dotenv_file_is_loaded(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("DASHBOARD_PASSWORD", raising=False)
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+    (tmp_path / ".env").write_text(
+        "DASHBOARD_PASSWORD=from-dotenv\nSECRET_KEY=from-dotenv-secret\n",
+        encoding="utf-8",
+    )
+
+    import api.config as config
+
+    config.load_dotenv(config.find_dotenv(usecwd=True))
+    get_settings.cache_clear()
+
+    s = get_settings()
+
+    assert s.dashboard_password == "from-dotenv"
+    assert s.secret_key == "from-dotenv-secret"
+
+
+def test_real_environment_variable_beats_dotenv_file(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("DASHBOARD_PASSWORD", "from-real-env")
+    monkeypatch.setenv("SECRET_KEY", "from-real-env-secret")
+    (tmp_path / ".env").write_text(
+        "DASHBOARD_PASSWORD=from-dotenv\nSECRET_KEY=from-dotenv-secret\n",
+        encoding="utf-8",
+    )
+
+    import api.config as config
+
+    config.load_dotenv(config.find_dotenv(usecwd=True))
+    get_settings.cache_clear()
+
+    s = get_settings()
+
+    assert s.dashboard_password == "from-real-env"

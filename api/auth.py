@@ -6,6 +6,7 @@ survives a restart.
 """
 
 from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import Depends, Header
 
@@ -14,7 +15,9 @@ from api.config import Settings, get_settings
 
 
 class AuthError(Exception):
-    def __init__(self, message: str, code: str, status: int, retry_after: int = 0):
+    def __init__(
+        self, message: str, code: str, status: int, retry_after: Optional[int] = None
+    ):
         super().__init__(message)
         self.message = message
         self.code = code

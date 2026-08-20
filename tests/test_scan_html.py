@@ -118,6 +118,18 @@ def test_bad_key_is_a_401(client):
     assert response.status_code == 401
 
 
+def test_401_carries_no_retry_after_header(client):
+    """A 401 implies no retry policy at all, unlike a 429. It must not
+    carry a Retry-After header -- not even Retry-After: 0."""
+    response = client.post(
+        "/v1/scan",
+        json={"html": "<html></html>"},
+        headers={"Authorization": "Bearer sk_live_wrong"},
+    )
+    assert response.status_code == 401
+    assert "Retry-After" not in response.headers
+
+
 def test_rate_limit_returns_429_with_retry_after(client):
     from api import store
     from api.config import get_settings
