@@ -1,0 +1,35 @@
+# Pinned to the version the model bundle was pickled with. Any other
+# version risks silently different predictions from the same model.
+scikit-learn==1.8.0
+
+# Held below 2.5 for the same reason. joblib 1.5.3 unpickles arrays by
+# assigning to `.shape`, which NumPy 2.5 deprecates — it emitted 1602
+# DeprecationWarnings on every model load, and the deprecation becomes an
+# error in a later NumPy, at which point the model stops loading at all.
+# joblib has no fixed release yet, so the pin is the fix. Revisit when it
+# does. Verified: predictions are byte-identical either way.
+numpy<2.5
+
+# Loads .env into the process environment at import time so the documented
+# `cp .env.example .env` quickstart actually works. Real environment
+# variables still win -- see api/config.py.
+python-dotenv==1.2.2
+
+fastapi==0.136.1
+uvicorn[standard]==0.47.0
+pydantic==2.12.5
+jinja2==3.1.6
+python-multipart>=0.0.9
+requests==2.32.5
+beautifulsoup4==4.14.3
+lxml>=5.2
+joblib==1.5.3
+pandas==2.3.3
+
+pytest==9.0.2
+
+# starlette's TestClient deprecated httpx in favour of httpx2 and says so
+# on every run. Installing what it asks for silences the warning at its
+# source; filtering it in pytest.ini would have hidden a real future
+# breakage instead. Test-only -- the service itself uses requests.
+httpx2>=2.12

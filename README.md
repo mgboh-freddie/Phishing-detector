@@ -161,6 +161,26 @@ checking.
 
 ---
 
+## The API
+
+There is now an HTTP service wrapping all of this — see
+[`docs/API.md`](docs/API.md).
+
+```
+python -m pip install -r requirements.txt
+python -m api.keys create --name "you"
+uvicorn api.main:app --reload --port 8000
+```
+
+Dashboard at http://localhost:8000/, interactive docs at
+http://localhost:8000/docs.
+
+**Requires Python 3.11 or newer.** The model bundle is pickled with
+scikit-learn 1.8.0, which has no wheels for 3.10; running on 3.10 forces
+1.7.2 and warns that predictions may be invalid.
+
+---
+
 ## How good is it, honestly?
 
 Tested properly (5-fold cross-validation, meaning the model was repeatedly

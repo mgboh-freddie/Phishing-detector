@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Phishing Detector{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <strong>Phishing Detector</strong>
+    {% if signed_in %}
+    <nav>
+      <a href="/">Scan</a>
+      <a href="/history">History</a>
+      <form method="post" action="/logout"><button type="submit">Sign out</button></form>
+    </nav>
+    {% endif %}
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+</body>
+</html>
