@@ -7,13 +7,31 @@ rendered or executed.
 
 ```
 python -m pip install -r requirements.txt
-copy .env.example .env          # then edit it
+cp .env.example .env            # Windows: copy .env.example .env
 python -m api.keys create --name "your-name"
 uvicorn api.main:app --reload --port 8000
 ```
 
 Interactive docs: http://localhost:8000/docs
 Dashboard: http://localhost:8000/
+
+Requires Python 3.11 or newer. The model bundle is pickled with
+scikit-learn 1.8.0, which publishes no wheels for 3.10.
+
+## Endpoints
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `POST` | `/v1/scan` | key | Scan a URL or a block of HTML |
+| `POST` | `/v1/scan/file` | key | Scan an uploaded `.html` file |
+| `GET` | `/v1/scans` | key | Your scan history, newest first, paginated |
+| `GET` | `/v1/scans/{id}` | key | One past scan with its features |
+| `GET` | `/v1/model` | key | Threshold, features, metrics, licence, limitations |
+| `GET` | `/v1/health` | none | Liveness and whether the model loaded |
+| `GET` | `/docs` | none | Interactive OpenAPI docs |
+
+History is scoped to the calling key. Another key's scan is a `404`, not a
+`403` — the API will not confirm that an id it cannot show you exists.
 
 ## Authentication
 
@@ -94,6 +112,27 @@ Every error has the same shape:
 
 URLs resolving to private, loopback, link-local, or reserved addresses
 are refused, and every redirect hop is re-checked.
+
+## Running it in Docker
+
+```
+docker build -t phishing-detector-api .
+```
+
+```
+docker run -p 8000:8000 -e DASHBOARD_PASSWORD=changeme -e SECRET_KEY=your-secret -v phishing-data:/app/data phishing-detector-api
+```
+
+**Use a named volume for `/app/data`, as above — not a host bind mount.**
+The container runs as a non-root user (uid 1000), and SQLite in WAL mode
+has to create `-wal` and `-shm` files *in that directory*, not just write
+the database file. A named volume inherits the image's ownership, so this
+works. A host directory bind-mounted over `/app/data` keeps the host's own
+ownership, and unless that directory is already writable by uid 1000 the
+container fails on startup with `unable to open database file`.
+
+If you do need a bind mount, make the host directory writable by uid 1000
+first (`chown 1000:1000 ./data`), or run with `--user "$(id -u):$(id -g)"`.
 
 ## Licence
 

@@ -18,6 +18,12 @@ COPY extract_features.py scan.py model_metrics.json ./
 COPY phishing_html_model.joblib ./
 COPY api/ ./api/
 
+# The database directory is created and owned here, but a host bind
+# mount over /app/data replaces this ownership with the host's own.
+# SQLite runs in WAL mode and must create -wal/-shm files IN this
+# directory, so mount a NAMED volume (which inherits the ownership
+# set below) rather than a bind mount, or pre-chown the host directory
+# to uid 1000. See docs/API.md, "Running it in Docker".
 RUN useradd --create-home --uid 1000 appuser \
  && mkdir -p /app/data \
  && chown -R appuser:appuser /app
