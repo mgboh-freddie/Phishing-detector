@@ -1,0 +1,40 @@
+# Render Blueprint. In Render: New > Blueprint, point it at this repo.
+#
+# Deliberately uses Render's native Python runtime rather than the
+# Dockerfile. Two reasons: the Dockerfile has never actually been built,
+# and it runs as a non-root user (uid 1000), which collides with how
+# Render mounts persistent disks. Native Python avoids both.
+services:
+  - type: web
+    name: phishing-detector-api
+    runtime: python
+    plan: free            # 512 MB RAM; the service needs ~280 MB loaded
+    region: frankfurt     # pick the one nearest you
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /v1/health
+    envVars:
+      # Generated once by Render and kept. Never commit a real one.
+      - key: SECRET_KEY
+        generateValue: true
+      # Set this yourself in the Render dashboard. Do not put it here.
+      - key: DASHBOARD_PASSWORD
+        sync: false
+      # Render terminates TLS, so the session cookie can demand Secure.
+      - key: DEBUG
+        value: "false"
+      # WARNING: on the free plan this path is EPHEMERAL. Every deploy,
+      # restart, and spin-down wipes it -- which means every API key and
+      # all scan history are lost and your users' keys stop working.
+      # To make it survive, upgrade the instance and attach a disk:
+      #
+      #   plan: starter
+      #   disk:
+      #     name: data
+      #     mountPath: /var/data
+      #     sizeGB: 1
+      #
+      # then set DB_PATH=/var/data/api.db
+      - key: DB_PATH
+        value: data/api.db
