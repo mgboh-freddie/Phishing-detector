@@ -30,7 +30,7 @@ def _create(settings, args) -> int:
     )
 
     print(f"Created key {key_id} for {args.name!r}.")
-    print("Store it now — it is shown once and cannot be recovered:")
+    print("Store it now. It is shown once and cannot be recovered:")
     print(f"  {plaintext}")
     return 0
 
