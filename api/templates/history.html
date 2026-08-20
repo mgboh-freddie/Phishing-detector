@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>History</h1>
+{% if not scans %}
+<p>Nothing scanned yet.</p>
+{% else %}
+<table>
+  <tr><th>When</th><th>Target</th><th>Score</th><th>Verdict</th><th></th></tr>
+  {% for scan in scans %}
+  <tr>
+    <td>{{ scan.created_at }}</td>
+    <td>{{ scan.target }}</td>
+    <td>{{ '%.3f'|format(scan.score) }}</td>
+    <td class="{{ scan.verdict }}">{{ scan.verdict }}</td>
+    <td><a href="/scan/{{ scan.id }}">{{ scan.id }}</a></td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% endblock %}

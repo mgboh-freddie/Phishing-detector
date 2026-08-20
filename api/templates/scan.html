@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Scan a page</h1>
+
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+<form method="post" action="/" enctype="multipart/form-data">
+  <label for="url">URL</label>
+  <input type="url" id="url" name="url" placeholder="https://example.com/login">
+
+  <label for="html">…or paste HTML</label>
+  <textarea id="html" name="html" rows="8"></textarea>
+
+  <label for="file">…or upload an .html file</label>
+  <input type="file" id="file" name="file" accept=".html,.htm">
+
+  <label for="threshold">Threshold: <output id="thresholdValue">0.30</output></label>
+  <input type="range" id="threshold" name="threshold" min="0" max="1"
+         step="0.01" value="0.30"
+         oninput="document.getElementById('thresholdValue').textContent =
+                  parseFloat(this.value).toFixed(2)">
+
+  <button type="submit">Scan</button>
+</form>
+
+{% if result %}
+<section class="result {{ result.verdict }}">
+  <h2>{{ result.verdict|upper }} — {{ '%.3f'|format(result.score) }}</h2>
+  <p>{{ result.target }} · threshold {{ '%.2f'|format(result.threshold) }} ·
+     {{ result.elapsed_ms }} ms</p>
+
+  {% for code in result.warnings %}
+  <p class="warning">
+    {% if code == 'small_simple_site' %}
+      This page is small and simple. The model was trained on large benign
+      sites, so it over-flags small ordinary ones — treat this verdict with
+      caution.
+    {% elif code == 'no_links_found' %}
+      No links were found on this page, so the minimum-link-length feature
+      fell back to zero and may not be comparable.
+    {% elif code == 'tls_verification_failed' %}
+      The site's certificate did not validate. That is itself a warning sign.
+    {% elif code == 'truncated' %}
+      The page exceeded 5 MB and was cut short, so these measurements are
+      based on part of it only.
+    {% else %}{{ code }}{% endif %}
+  </p>
+  {% endfor %}
+
+  <table>
+    <tr><th>Feature</th><th>Value</th></tr>
+    {% for name, value in result.features.items() %}
+    <tr><td>{{ name }}</td><td>{{ value }}</td></tr>
+    {% endfor %}
+  </table>
+</section>
+{% endif %}
+{% endblock %}

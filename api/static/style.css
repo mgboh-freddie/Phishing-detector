@@ -1,0 +1,21 @@
+:root { --bad: #b3261e; --good: #1b5e20; --line: #d7d7d7; }
+* { box-sizing: border-box; }
+body { font: 16px/1.5 system-ui, sans-serif; margin: 0; color: #1a1a1a; }
+header { display: flex; justify-content: space-between; align-items: center;
+         padding: 1rem 1.5rem; border-bottom: 1px solid var(--line); }
+header nav { display: flex; gap: 1rem; align-items: center; }
+main { max-width: 52rem; margin: 0 auto; padding: 1.5rem; }
+label { display: block; margin: 1rem 0 0.25rem; font-weight: 600; }
+input, textarea, button { font: inherit; }
+input[type=url], input[type=password], textarea { width: 100%; padding: 0.5rem;
+  border: 1px solid var(--line); border-radius: 4px; }
+button { margin-top: 1rem; padding: 0.5rem 1rem; border-radius: 4px;
+  border: 1px solid var(--line); background: #f4f4f4; cursor: pointer; }
+table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--line); }
+.result { margin-top: 2rem; padding: 1rem; border: 1px solid var(--line);
+  border-radius: 6px; }
+.result.phishing h2, td.phishing { color: var(--bad); }
+.result.benign h2, td.benign { color: var(--good); }
+.warning { background: #fff5d6; border-left: 4px solid #c79100; padding: 0.6rem 0.8rem; }
+.error { color: var(--bad); font-weight: 600; }

@@ -7,6 +7,7 @@ joblib.load on a 23 MB bundle is far too slow to repeat per request.
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from api import store
 from api.config import get_settings
@@ -15,6 +16,7 @@ from api.limits import MaxBodySizeMiddleware
 from api.routers import meta as meta_router
 from api.routers import scan as scan_router
 from api.routers import scans as scans_router
+from api.routers import ui as ui_router
 from api.scoring import load_bundle
 
 
@@ -44,6 +46,8 @@ def create_app() -> FastAPI:
     app.include_router(scan_router.router)
     app.include_router(scans_router.router)
     app.include_router(meta_router.router)
+    app.include_router(ui_router.router)
+    app.mount("/static", StaticFiles(directory="api/static"), name="static")
     return app
 
 
