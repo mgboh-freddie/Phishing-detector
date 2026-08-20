@@ -1,0 +1,12 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+tests/
+docs/
+data/*.csv
+data/*.db
+raw/
+.env
+CODE_EXPLAINED.md
