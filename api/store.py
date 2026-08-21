@@ -237,16 +237,29 @@ def ensure_bootstrap_key(db_path: str, plaintext: str, name: str, threshold=None
     "leave it alone," not "revive it."
     """
     key_hash = hash_key(plaintext)
-    with connect(db_path) as conn:
-        existing = conn.execute(
-            "SELECT id FROM api_keys WHERE key_hash = ?", (key_hash,)
-        ).fetchone()
-        if existing is not None:
-            return None
+    key_id = new_id("key")
 
-        key_id = new_id("key")
-        _insert_key_row(conn, key_id, name, key_hash, threshold, rate_limit=60)
-    return key_id
+    # INSERT OR IGNORE rather than SELECT-then-INSERT: key_hash is UNIQUE,
+    # so the conflict is resolved by the database in one statement. Two
+    # instances starting at once therefore cannot both insert, and the
+    # loser no-ops instead of raising IntegrityError out of startup.
+    # ensure_internal_key above uses the same pattern.
+    with connect(db_path) as conn:
+        cursor = conn.execute(
+            "INSERT OR IGNORE INTO api_keys (id, name, key_hash, threshold,"
+            " rate_limit, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                key_id,
+                name,
+                key_hash,
+                0.30 if threshold is None else float(threshold),
+                60,
+                utcnow(),
+            ),
+        )
+        created = cursor.rowcount > 0
+
+    return key_id if created else None
 
 
 def save_scan(db_path: str, record: dict, store_raw_html: bool) -> None:

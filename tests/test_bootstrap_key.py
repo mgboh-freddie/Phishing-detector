@@ -127,3 +127,61 @@ def test_seeded_key_name_comes_from_bootstrap_api_key_name(build_app):
     db_path = get_settings().db_path
     row = store.find_key_by_hash(db_path, store.hash_key(BOOTSTRAP_KEY))
     assert row["name"] == "ops-friend"
+
+
+def test_settings_repr_hides_every_secret(monkeypatch):
+    """Settings shows up in traceback frames and the catch-all error handler
+    logs tracebacks, so one unhandled exception would otherwise write every
+    secret into the log."""
+    from api.config import get_settings
+
+    monkeypatch.setenv("DASHBOARD_PASSWORD", "PW-THAT-MUST-NOT-LEAK")
+    monkeypatch.setenv("SECRET_KEY", "SIGNING-KEY-THAT-MUST-NOT-LEAK")
+    monkeypatch.setenv("BOOTSTRAP_API_KEY", "sk_live_" + "B" * 32)
+    get_settings.cache_clear()
+
+    settings = get_settings()
+    rendered = repr(settings)
+
+    assert "PW-THAT-MUST-NOT-LEAK" not in rendered
+    assert "SIGNING-KEY-THAT-MUST-NOT-LEAK" not in rendered
+    assert "sk_live_" not in rendered
+    # The values are still usable by code that legitimately needs them.
+    assert settings.dashboard_password == "PW-THAT-MUST-NOT-LEAK"
+    assert settings.bootstrap_api_key == "sk_live_" + "B" * 32
+    get_settings.cache_clear()
+
+
+def test_concurrent_seeding_creates_exactly_one_row(tmp_path):
+    """Two instances starting at once must not both insert. key_hash is
+    UNIQUE and the insert is INSERT OR IGNORE, so the loser no-ops rather
+    than raising IntegrityError out of startup."""
+    import threading
+
+    from api import store
+
+    db = str(tmp_path / "race.db")
+    store.init_db(db)
+    plaintext = "sk_live_" + "C" * 32
+
+    results = []
+    barrier = threading.Barrier(8)
+
+    def seed():
+        barrier.wait()
+        results.append(store.ensure_bootstrap_key(db, plaintext, "racer", 0.30))
+
+    threads = [threading.Thread(target=seed) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    with store.connect(db) as conn:
+        rows = conn.execute(
+            "SELECT COUNT(*) AS n FROM api_keys WHERE key_hash = ?",
+            (store.hash_key(plaintext),),
+        ).fetchone()["n"]
+
+    assert rows == 1, "concurrent seeding created duplicate key rows"
+    assert len([r for r in results if r is not None]) == 1, "more than one caller claimed to have created the key"
