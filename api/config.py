@@ -1,7 +1,7 @@
 """Environment-driven settings. Read once, cached, immutable."""
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 
 from dotenv import find_dotenv, load_dotenv
@@ -44,9 +44,14 @@ class Settings:
     max_redirects: int
     small_site_tag_threshold: int
     store_raw_html: bool
-    dashboard_password: str
-    secret_key: str
+    # repr=False on all three: Settings appears in traceback frames, and
+    # the catch-all error handler logs tracebacks. Without this, one
+    # unhandled exception writes every secret into the log.
+    dashboard_password: str = field(repr=False)
+    secret_key: str = field(repr=False)
     debug: bool
+    bootstrap_api_key: str = field(default="", repr=False)
+    bootstrap_api_key_name: str = "bootstrap"
 
 
 @lru_cache(maxsize=1)
@@ -64,4 +69,6 @@ def get_settings() -> Settings:
         dashboard_password=_required("DASHBOARD_PASSWORD"),
         secret_key=_required("SECRET_KEY"),
         debug=_bool("DEBUG", False),
+        bootstrap_api_key=os.environ.get("BOOTSTRAP_API_KEY", ""),
+        bootstrap_api_key_name=os.environ.get("BOOTSTRAP_API_KEY_NAME", "bootstrap"),
     )

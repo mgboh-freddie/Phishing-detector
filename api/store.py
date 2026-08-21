@@ -151,24 +151,28 @@ def hash_key(plaintext: str) -> str:
     return hashlib.sha256(plaintext.encode("utf-8")).hexdigest()
 
 
+def _insert_key_row(conn, key_id: str, name: str, key_hash: str, threshold, rate_limit: int) -> None:
+    conn.execute(
+        "INSERT INTO api_keys (id, name, key_hash, threshold, rate_limit, created_at)"
+        " VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            key_id,
+            name,
+            key_hash,
+            0.30 if threshold is None else float(threshold),
+            int(rate_limit),
+            utcnow(),
+        ),
+    )
+
+
 def create_key(db_path: str, name: str, threshold=None, rate_limit: int = 60):
     """Create a key. The plaintext is returned once and never recoverable."""
     key_id = new_id("key")
     plaintext = "sk_live_" + secrets.token_urlsafe(24)[:32]
 
     with connect(db_path) as conn:
-        conn.execute(
-            "INSERT INTO api_keys (id, name, key_hash, threshold, rate_limit, created_at)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
-            (
-                key_id,
-                name,
-                hash_key(plaintext),
-                0.30 if threshold is None else float(threshold),
-                int(rate_limit),
-                utcnow(),
-            ),
-        )
+        _insert_key_row(conn, key_id, name, hash_key(plaintext), threshold, rate_limit)
     return key_id, plaintext
 
 
@@ -219,6 +223,43 @@ def ensure_internal_key(db_path: str, threshold: float) -> None:
                 utcnow(),
             ),
         )
+
+
+def ensure_bootstrap_key(db_path: str, plaintext: str, name: str, threshold=None):
+    """Seed a key from a known plaintext (e.g. an env var) if it doesn't
+    already exist. Returns the new key id, or None if a row with that
+    hash was already present.
+
+    Deliberately does nothing when a row already exists, even if that
+    row has been revoked. An operator who revokes a leaked bootstrap key
+    must not have it silently resurrected by the next restart -- this
+    function is called on every startup, so "already exists" has to mean
+    "leave it alone," not "revive it."
+    """
+    key_hash = hash_key(plaintext)
+    key_id = new_id("key")
+
+    # INSERT OR IGNORE rather than SELECT-then-INSERT: key_hash is UNIQUE,
+    # so the conflict is resolved by the database in one statement. Two
+    # instances starting at once therefore cannot both insert, and the
+    # loser no-ops instead of raising IntegrityError out of startup.
+    # ensure_internal_key above uses the same pattern.
+    with connect(db_path) as conn:
+        cursor = conn.execute(
+            "INSERT OR IGNORE INTO api_keys (id, name, key_hash, threshold,"
+            " rate_limit, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                key_id,
+                name,
+                key_hash,
+                0.30 if threshold is None else float(threshold),
+                60,
+                utcnow(),
+            ),
+        )
+        created = cursor.rowcount > 0
+
+    return key_id if created else None
 
 
 def save_scan(db_path: str, record: dict, store_raw_html: bool) -> None:
