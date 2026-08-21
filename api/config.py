@@ -47,6 +47,8 @@ class Settings:
     dashboard_password: str
     secret_key: str
     debug: bool
+    bootstrap_api_key: str = ""
+    bootstrap_api_key_name: str = "bootstrap"
 
 
 @lru_cache(maxsize=1)
@@ -64,4 +66,6 @@ def get_settings() -> Settings:
         dashboard_password=_required("DASHBOARD_PASSWORD"),
         secret_key=_required("SECRET_KEY"),
         debug=_bool("DEBUG", False),
+        bootstrap_api_key=os.environ.get("BOOTSTRAP_API_KEY", ""),
+        bootstrap_api_key_name=os.environ.get("BOOTSTRAP_API_KEY_NAME", "bootstrap"),
     )

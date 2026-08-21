@@ -17,9 +17,32 @@ Three ways to deal with it:
    set `DB_PATH=/var/data/api.db`. This is the straightforward fix.
 2. **Accept it** and recreate keys after each restart. Fine while you are
    only demoing to yourself.
-3. **Ask me to add key bootstrapping from an environment variable**, so one
-   key is seeded at startup and survives restarts even on the free plan.
-   Small change, and it makes the free tier genuinely usable.
+3. **Seed a key from an environment variable.** The app supports this
+   directly: set `BOOTSTRAP_API_KEY` and it creates that key at startup,
+   every startup, on any plan. Because the key lives in Render's env
+   config rather than the filesystem, it survives every deploy, restart,
+   and spin-down -- the free tier's persistence problem, solved without
+   a paid disk.
+
+   Generate a strong key locally:
+
+   ```bash
+   python -c "import secrets; print(secrets.token_urlsafe(32))"
+   ```
+
+   Set `BOOTSTRAP_API_KEY` to that value in the Render dashboard (it's
+   already declared in `render.yaml` with `sync: false`, so Render
+   prompts for it and never stores it in the repo). Optionally set
+   `BOOTSTRAP_API_KEY_NAME` too, to label the key something other than
+   `bootstrap` in `python -m api.keys list`.
+
+   The app refuses to start if the key is shorter than 24 characters --
+   a weak key on a public API is worse than no key. Hand your friend the
+   plaintext you generated the way you'd hand over a password, since
+   that's what it is. If it ever leaks, revoke it (`python -m api.keys
+   revoke <key_id>`, run locally against a copy of the database if you
+   have no shell) -- a revoked bootstrap key stays revoked, it is never
+   recreated by a later restart.
 
 The free plan also **spins down after 15 minutes idle**. The first request
 after that waits for the container to start plus ~2.4s to load the model, so
@@ -60,8 +83,9 @@ You want `{"status":"ok","model_loaded":true,...}`.
 python -m api.keys create --name "friend-name" --rate-limit 120
 ```
 
-On the free plan there is no shell, so seed keys locally and commit nothing —
-or take option 3 above.
+On the free plan there is no shell, so use option 3 above instead: generate a
+key locally, set it as `BOOTSTRAP_API_KEY` in the Render dashboard, and
+redeploy. The app seeds it on startup and it survives every restart.
 
 ## Why native Python and not the Dockerfile
 

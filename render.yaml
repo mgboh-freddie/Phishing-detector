@@ -38,3 +38,11 @@ services:
       # then set DB_PATH=/var/data/api.db
       - key: DB_PATH
         value: data/api.db
+      # Seeds an API key at startup from its plaintext value, so you have
+      # a working key even on the free plan -- no shell to run
+      # `python -m api.keys create` in, and any key created another way
+      # would be wiped by the next restart anyway. sync: false means it
+      # is never committed; set it yourself in the Render dashboard. See
+      # docs/DEPLOY-RENDER.md for how to generate one.
+      - key: BOOTSTRAP_API_KEY
+        sync: false
