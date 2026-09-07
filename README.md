@@ -40,14 +40,6 @@ it at an actual web page.
 
 ### Windows quick start
 
-This folder lives at `C:\Users\USER\Desktop\startup`.
-
-**Open a terminal in the right place.** Open the `startup` folder in File
-Explorer, click the address bar at the top, type `cmd`, press Enter. A black
-window opens already pointed at this folder. (Doing it this way saves you
-typing out the path.)
-
-**One-time setup.** In that window:
 
 ```
 py -m pip install scikit-learn pandas beautifulsoup4 lxml joblib requests
