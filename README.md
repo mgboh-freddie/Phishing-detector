@@ -1,301 +1,385 @@
-# Phishing Detector — Start Up Folder
+# Phishing Detector
 
-Freddie's project. Last updated: 6 August 2026.
+A machine learning based phishing detection system that analyzes the structure and content of HTML pages to determine whether a webpage is likely to be legitimate or phishing.
 
-**If you forget everything else, read this bit.**
+The system combines a static HTML feature extractor with a trained machine learning model and supports scanning individual HTML files, directories, and live URLs.
 
-You have built a thing that looks at a web page and says whether it's a
-phishing page. It works. It's about as good as the published research on the
-same data. It is not yet something you can sell, for one specific legal reason
-explained below, and there is one known weakness you need to fix before it's a
-real product.
+## Overview
 
----
+Phishing websites are designed to imitate legitimate websites in order to trick users into revealing sensitive information such as passwords, financial details, or personal data.
 
-## What is this, in plain words?
+This project detects potentially malicious webpages by analyzing **13 static HTML features** rather than executing the webpage in a browser.
 
-Phishing pages are fake websites that pretend to be your bank, your email
-provider, whatever — so you type your password in and the attacker steals it.
+The system works in two main stages:
 
-You built a system that spots them. It works in two parts:
+1. **Feature Extraction**
+   The HTML page is analyzed to extract 13 structural features, including HTML tag counts, forms, JavaScript characteristics, links, and other page-level properties.
 
-**Part 1 — the extractor.** It opens a web page and measures 13 things about
-it. Not what the page *says*, but how it's *built*. How many HTML tags. How
-many login forms. How much JavaScript, and how scrambled that JavaScript looks.
-How many links point off to other websites versus staying on this one. Think of
-it like a building inspector who never reads the sign on the door — they just
-measure the walls, count the exits, check the wiring.
+2. **Machine Learning Classification**
+   The extracted features are passed to a trained machine learning model that produces a probability score between 0 and 1.
 
-**Part 2 — the model.** It takes those 13 measurements and gives a score from
-0 to 1. Higher means more likely phishing. Anything at or above 0.30 gets
-called PHISHING.
+A score at or above the default threshold of **0.30** is classified as `PHISHING`.
 
-The extractor was the missing piece until now. Before, your model could only
-read 13 numbers that somebody else had already worked out. Now you can point
-it at an actual web page.
-
----
-
-## How do I run it?
-
-### Windows quick start
-
-
-```
-py -m pip install scikit-learn pandas beautifulsoup4 lxml joblib requests
+```text
+HTML Page / URL
+       ↓
+Feature Extraction
+       ↓
+13 HTML Features
+       ↓
+Machine Learning Model
+       ↓
+Probability Score
+       ↓
+PHISHING / BENIGN
 ```
 
-If `py` isn't recognised, try `python` instead. If neither works, Python isn't
-installed — get it from python.org and tick **"Add Python to PATH"** during
-install, which is the box everyone misses.
+## Features
 
-**Then, to scan things:**
+The project currently supports:
 
-```
-py scan.py data\phishy.html              a single file
-py scan.py data\                         every HTML file in a folder
-py scan.py https://example.com           a live website
-py scan.py data\ --csv results.csv       save results to a spreadsheet
-py scan.py data\ --threshold 0.5         be less trigger-happy
-```
+- HTML file scanning
+- Directory scanning
+- Live URL scanning
+- Automatic HTML feature extraction
+- Phishing probability scoring
+- Configurable classification threshold
+- CSV result export
+- Dataset collection from URLs
+- REST API
+- Interactive API documentation
 
-Note Windows uses back-slashes `\` in paths where Mac and Linux use `/`.
+## Installation
 
-### Mac or Linux
+### Requirements
 
-Same thing, with `python3` instead of `py` and forward slashes:
+- Python 3.11 or newer
+- pip
 
-```
-pip install scikit-learn pandas beautifulsoup4 lxml joblib requests
-python3 scan.py data/phishy.html
-```
+The API and model bundle currently require Python 3.11 or newer because the trained model was created using scikit-learn 1.8.0.
 
-### What you'll see
+### Install dependencies
 
-You'll get something like:
-
-```
-!! 0.695  PHISHING  phishy.html
-   0.112  benign    normal_site.html
-```
-
----
-
-## Building your own data (collect.py)
-
-This is how you escape both problems above. Read that section first if you've
-forgotten why you're doing this.
-
-**What it does:** takes a list of URLs, downloads each page, measures the same
-13 things, and writes a CSV in the exact same shape as the training data you
-already have.
-
-```
-py collect.py phish_urls.csv --label 1 --out phish.csv --save-html raw\
-py collect.py benign_urls.txt --label 0 --out benign.csv --save-html raw\
-```
-
-`--label 1` means phishing, `--label 0` means benign. Input can be a plain
-text file (one URL per line) or a CSV with a `url` column, which is what
-PhishTank exports.
-
-**Always use `--save-html`.** It keeps a copy of every page it downloads. If
-you later change how a feature is calculated, you can re-measure those saved
-copies instead of refetching — and by then the phishing pages will be long
-dead and gone forever. Cheap insurance.
-
-**You can stop it any time.** Close the window, lose your connection, whatever.
-Run the same command again and it picks up where it left off, skipping URLs
-it already has.
-
-**Expect lots of failures.** Phishing sites get taken down within hours of
-being reported, so a large share of any PhishTank list will already be dead.
-That's normal, not a bug. Failures are logged to a `.errors.txt` file. Run
-collection repeatedly over days or weeks rather than expecting one big haul.
-
-### Where to get URLs
-
-- **Phishing:** PhishTank (phishtank.org) publishes a live feed of reported
-  phishing URLs. Free with an API key. **Check their terms for commercial use
-  before you build on it** — you've been caught by a licence once already.
-- **Benign:** the Tranco list (tranco-list.eu) ranks popular domains. But do
-  not use only that — it's big famous sites, which is exactly the mistake that
-  created Problem 2. Deliberately gather small, plain business websites too.
-  Local directories and small-business listings are good hunting grounds.
-
-Aim for roughly balanced numbers of each, as your current data is.
-
-### A note on certificates
-
-Phishing sites frequently have broken or fake SSL certificates, so by default
-the collector doesn't check them — otherwise you'd lose most of your samples.
-This is safe here **only because the collector never opens or runs anything
-it downloads**, it just reads the text. Pass `--secure` if you want strict
-checking.
-
----
-
-## What's in this folder?
-
-| File | What it is |
-| --- | --- |
-| `README.md` | This file. |
-| `CODE_EXPLAINED.md` | Plain-language walkthrough of every script. |
-| `scan.py` | **The thing you run.** Page in, verdict out. |
-| `collect.py` | Builds your own training data from a list of URLs. |
-| `extract_features.py` | The extractor. Measures the 13 things. Used by both scripts. |
-| `phishing_html_model.joblib` | The trained model. The brain. |
-| `model_metrics.json` | How well it scores, in numbers. |
-| `html_feature_spec.md` | Exact definition of each of the 13 measurements, from the research paper. |
-| `data/HTML_Top13_Features.csv` | The training data. ~20,000 pages. |
-| `data/phishy.html` | A fake phishing page for testing. |
-| `data/realistic_benign.html` | A fake normal page for testing. |
-
----
-
-## The API
-
-There is now an HTTP service wrapping all of this — see
-[`docs/API.md`](docs/API.md).
-
-```
+```bash
 python -m pip install -r requirements.txt
+```
+
+If you are using the command-line scanner without the requirements file, install:
+
+```bash
+python -m pip install scikit-learn pandas beautifulsoup4 lxml joblib requests
+```
+
+## Usage
+
+### Scan a single HTML file
+
+```bash
+python scan.py data/phishy.html
+```
+
+### Scan all HTML files in a directory
+
+```bash
+python scan.py data/
+```
+
+### Scan a live website
+
+```bash
+python scan.py https://example.com
+```
+
+### Save results to CSV
+
+```bash
+python scan.py data/ --csv results.csv
+```
+
+### Change the classification threshold
+
+```bash
+python scan.py data/ --threshold 0.5
+```
+
+The threshold controls how sensitive the classifier is.
+
+A lower threshold generally increases phishing detection but can also increase false positives.
+
+A higher threshold reduces false positives but may allow more phishing pages to pass undetected.
+
+## Example Output
+
+```text
+!! 0.695  PHISHING  phishy.html
+   0.112  BENIGN    normal_site.html
+```
+
+The numerical value represents the model's phishing probability.
+
+## Building a Dataset
+
+The project includes `collect.py`, which can collect webpages from a list of URLs and extract the same 13 features used by the trained model.
+
+### Collect phishing pages
+
+```bash
+python collect.py phish_urls.csv --label 1 --out phish.csv --save-html raw/
+```
+
+### Collect benign pages
+
+```bash
+python collect.py benign_urls.txt --label 0 --out benign.csv --save-html raw/
+```
+
+`--label 1` represents phishing pages.
+
+`--label 0` represents benign pages.
+
+The input can either be:
+
+- A plain text file containing one URL per line
+- A CSV file containing a `url` column
+
+The `--save-html` option stores downloaded HTML pages locally. This makes it possible to re-extract features later without downloading the pages again.
+
+Websites may become unavailable after collection, particularly phishing websites, so preserving the downloaded HTML is useful for reproducible experimentation.
+
+## Data Sources
+
+For future dataset development, the project is designed to work with:
+
+### Phishing URLs
+
+Phishing URLs can be sourced from PhishTank.
+
+### Benign URLs
+
+Benign websites can be collected from domain-ranking sources such as the Tranco list, while also including smaller and less complex websites to improve dataset diversity.
+
+The dataset should contain a reasonably balanced representation of phishing and benign examples.
+
+## Model Performance
+
+The model was evaluated using **5-fold cross-validation**.
+
+Current results:
+
+| Metric | Result |
+|---|---:|
+| Phishing Detection Rate | **96.7%** |
+| ROC-AUC | **0.9845** |
+| False Negatives | **328 / ~10,000 phishing pages** |
+| False Positives | **1,263 / ~10,000 benign pages** |
+
+The model achieves a high ROC-AUC, indicating strong separation between the phishing and benign classes within the evaluation dataset.
+
+The results are also broadly comparable to the published research associated with the dataset, which reported an F1 score of 0.9386 using Random Forest on the same 13 HTML features.
+
+## Classification Threshold
+
+The default classification threshold is:
+
+```text
+0.30
+```
+
+This threshold prioritizes detecting phishing pages, but it also results in more false positives.
+
+The threshold can be changed depending on the intended application.
+
+For example:
+
+```bash
+python scan.py data/ --threshold 0.50
+```
+
+A lower threshold may be appropriate where missing a phishing page is considered more costly.
+
+A higher threshold may be preferable in environments where false positives generate significant operational overhead.
+
+## API
+
+The project includes an HTTP API that provides access to the phishing detection system.
+
+### Start the API
+
+Install the project requirements:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+Create an API key:
+
+```bash
 python -m api.keys create --name "you"
+```
+
+Start the server:
+
+```bash
 uvicorn api.main:app --reload --port 8000
 ```
 
-Dashboard at http://localhost:8000/, interactive docs at
-http://localhost:8000/docs.
+The local dashboard is available at:
 
-**Requires Python 3.11 or newer.** The model bundle is pickled with
-scikit-learn 1.8.0, which has no wheels for 3.10; running on 3.10 forces
-1.7.2 and warns that predictions may be invalid.
+```text
+http://localhost:8000/
+```
 
----
+Interactive API documentation:
 
-## How good is it, honestly?
+```text
+http://localhost:8000/docs
+```
 
-Tested properly (5-fold cross-validation, meaning the model was repeatedly
-tested on pages it had never seen):
+For detailed API information, see:
 
-- **Catches 96.7%** of phishing pages.
-- **Misses 328** out of roughly 10,000 phishing pages.
-- **Falsely accuses 1,263** out of roughly 10,000 innocent pages — about 1 in 8.
-- **ROC-AUC 0.9845** — a measure of how well it separates the two groups,
-  where 1.0 is perfect and 0.5 is a coin flip.
+```text
+docs/API.md
+```
 
-**Context that matters:** the researchers who built this dataset got an F1
-score of 0.9386 with Random Forest on the same 13 features. You're in the same
-place. You are not behind. HTML is genuinely the hardest of their file types —
-they got near-perfect scores on Word and PDF, because real web pages are messy
-in a way that document files aren't.
+## Project Structure
 
-### The threshold is a dial, not a fact
+```text
+Phishing-detector/
+│
+├── README.md
+├── CODE_EXPLAINED.md
+├── scan.py
+├── collect.py
+├── extract_features.py
+├── phishing_html_model.joblib
+├── model_metrics.json
+├── html_feature_spec.md
+│
+├── api/
+│   └── ...
+│
+├── docs/
+│   └── API.md
+│
+└── data/
+    ├── HTML_Top13_Features.csv
+    ├── phishy.html
+    └── realistic_benign.html
+```
 
-0.30 is aggressive. It's set to catch as much phishing as possible, and it
-pays for that with false alarms. Raise it to 0.50 and you'll accuse far fewer
-innocent pages but let more phishing through.
+### Important Files
 
-Which setting is right depends entirely on who's using it. A consumer browser
-extension should probably catch more and tolerate false alarms. A security firm
-drowning in alerts wants the opposite. **This dial being adjustable per
-customer is a genuine product feature, not a flaw.**
+| File | Description |
+|---|---|
+| `scan.py` | Command-line phishing scanner |
+| `collect.py` | Collects webpages and builds feature datasets |
+| `extract_features.py` | Extracts the 13 HTML features |
+| `phishing_html_model.joblib` | Trained machine learning model |
+| `model_metrics.json` | Model evaluation metrics |
+| `html_feature_spec.md` | Definitions of the 13 HTML features |
+| `api/` | HTTP API implementation |
+| `docs/API.md` | API documentation |
+| `data/` | Training and testing data |
 
----
+## Dataset and Attribution
 
-## Two problems you must not forget
+The initial model was trained using the **CIC-Trap4Phish** dataset.
 
-### Problem 1: You cannot legally sell this yet
+The dataset is associated with the following research:
 
-The CIC-Trap4Phish dataset is licensed **CC BY-NC 4.0**. The NC means
-**non-commercial**. You may use it to learn, to build your portfolio, and to
-publish research — with a citation. You may **not** build a business on it.
+> Nejati, F., Rabbani, M., Mirani, M., Piya, G., Opushnyev, I., Ghorbani, A. A., & Dadkhah, S. (2026). CIC-Trap4Phish: A Unified Multi-Format Dataset for Phishing and Quishing Attachment Detection. arXiv:2602.09015.
 
-This is not a technicality you can argue your way around.
+Research paper:
 
-**The escape route.** The research paper says exactly where they got their
-data: malicious pages from **PhishTank**, benign pages **crawled from Google**.
-Both are available to you directly. Now that you have a working extractor, you
-can go and collect your own pages from those same sources, run your extractor
-over them, and train on the result. That dataset is yours. No licence, no
-restriction.
+https://arxiv.org/abs/2602.09015
 
-**So the extractor isn't just the bridge to a product — it's the way out of the
-licence trap.** That's why it was the right thing to build first.
+Dataset:
 
-Required citation while you're using their data:
+https://www.unb.ca/cic/datasets/trap4phish2025.html
 
-> Nejati, F., Rabbani, M., Mirani, M., Piya, G., Opushnyev, I., Ghorbani,
-> A. A., & Dadkhah, S. (2026). CIC-Trap4Phish: A Unified Multi-Format Dataset
-> for Phishing and Quishing Attachment Detection. arXiv:2602.09015.
+The dataset should be used according to its applicable license and attribution requirements.
 
-### Problem 2: It's biased against small, simple websites
+## Limitations
 
-This one is subtle and it matters commercially.
+Although the model performs well on the evaluation dataset, there are important limitations to consider before using it in a production security environment.
 
-Look at the training data. Benign pages have a **median of 514 HTML tags**.
-Malicious pages have **91**. The researchers got their benign pages by
-crawling Google and Wikipedia — big, mature, complicated sites. Their phishing
-pages are phishing kits, which are small and simple by nature.
+### Dataset Bias
 
-So the model has partly learned a shortcut: **"small and simple means
-phishing."**
+The current training dataset contains differences between benign and phishing webpages that may not fully represent the diversity of the modern web.
 
-Test it yourself. `data/realistic_benign.html` is a perfectly innocent bakery
-website. It scores 0.365 and gets flagged.
+For example, the benign pages in the dataset tend to contain significantly more HTML elements than the phishing pages.
 
-Why this is a business problem: you picked this product because small
-businesses and individuals are your buyers. A small business with a clean,
-simple one-page site is exactly what this model wrongly accuses. Your customer
-and your blind spot are the same people.
+This creates a potential shortcut for the model, where relatively small and simple webpages may receive higher phishing scores even when they are legitimate.
 
-**The fix** is the same as the licence fix — collect your own benign pages
-from small, ordinary websites, not just Wikipedia-scale ones. Same solution
-to both problems.
+A test using the included `realistic_benign.html` page demonstrates this limitation.
 
----
+### False Positives
 
-## Where you are, and what's next
+The current model produces false positives alongside its high phishing detection rate.
 
-**Done:**
-1. Trained a model matching published research quality.
-2. Found the exact feature definitions from the paper.
-3. Built the extractor, so raw pages work now.
-4. Connected extractor to model — end-to-end scanning works.
+This means the model should not be treated as an unquestionable security verdict.
 
-**The immediate next job — validation.** The extractor's logic is sound and
-tested, but it has *not* been checked against the researchers' own numbers.
-That check is the important one, and it goes like this:
+For production applications, model predictions should ideally be combined with additional security signals and validation mechanisms.
 
-1. Download the raw HTML sample files from the UNB dataset page.
-2. Run the extractor over them.
-3. Compare your numbers to the rows in `HTML_Top13_Features.csv`, matching on
-   the `file_name` column.
-4. If `tag_count` for a given file matches theirs, you're good. If not, adjust.
+### Dataset Licensing
 
-If your extractor computes things even slightly differently from theirs, the
-model will quietly get worse on real pages without ever throwing an error.
-That's the failure mode to fear.
+The initial dataset has restrictions on commercial use.
 
-The three most likely places for a mismatch are flagged in
-`html_feature_spec.md`: `min_link_length` when a page has no links,
-`script_entropy` (average across script blocks vs. one big blob), and the two
-whitespace ratios, which sound identical but measure different things.
+For a commercial deployment, the model should be retrained using appropriately sourced data with licensing terms that permit the intended use.
 
-**After that:** collect your own data from PhishTank and ordinary small
-websites, retrain, and you have something you own outright and can sell.
+## Security Considerations
 
----
+The feature extractor uses **static HTML analysis**.
 
-## A note on safety
+Downloaded webpages are treated as text and are not rendered or executed in a browser.
 
-The extractor **downloads pages but never opens or runs them**. It reads the
-HTML as plain text. That's the entire reason the research used "static"
-features. Don't change this — if you start rendering pages in a real browser to
-get better measurements, you're executing attacker-controlled code on your own
-machine.
+This is an important security property because rendering an attacker-controlled webpage can execute JavaScript or trigger other browser behavior.
 
-Useful links:
+The current architecture intentionally avoids executing downloaded webpage content.
 
-- Dataset: https://www.unb.ca/cic/datasets/trap4phish2025.html
-- Paper: https://arxiv.org/abs/2602.09015
+## Roadmap
+
+### Completed
+
+- [x] Train initial phishing classification model
+- [x] Identify and implement the 13 HTML features
+- [x] Build the HTML feature extractor
+- [x] Connect feature extraction to the trained model
+- [x] Implement command-line scanning
+- [x] Add URL scanning
+- [x] Add CSV result export
+- [x] Build URL dataset collection pipeline
+- [x] Add HTTP API
+
+### Planned
+
+- [ ] Validate extracted features against the original dataset
+- [ ] Build a more representative benign dataset
+- [ ] Collect additional phishing samples
+- [ ] Retrain the model using the expanded dataset
+- [ ] Evaluate additional machine learning algorithms
+- [ ] Improve false-positive performance
+- [ ] Add more comprehensive API testing
+- [ ] Deploy the detection API
+
+## Disclaimer
+
+This project is intended for research, education, and security experimentation.
+
+A machine learning prediction should not be treated as definitive proof that a webpage is malicious or legitimate.
+
+Always combine automated detection with appropriate security controls and human review where necessary.
+
+## Author
+
+**Freddie Mgboh**
+
+Electronics Engineering | Software Engineering | Data Science & Machine Learning
+
+GitHub:
+
+https://github.com/mgboh-freddie
+
+## License
+
+See the dataset and project licensing information before using this project or its associated data for commercial purposes.
